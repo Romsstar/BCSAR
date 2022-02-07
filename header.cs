@@ -17,12 +17,12 @@ namespace BCSAR.CSAR
         public int STRG_size;
 
         public int INFO_id; // Always 0x2001
-        public int INFO_pointer;
-        public int INFO_size;
+        public static int INFO_pointer;
+        public static int INFO_size;
 
         public int FILE_id; // Always 0x2002
-        public int FILE_pointer;
-        public int FILE_size;
+        public static int FILE_pointer;
+        public static int FILE_size;
 
         public int partition4_pointer; //usually not applicable
         public int partition4__size;

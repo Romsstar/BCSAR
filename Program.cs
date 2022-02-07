@@ -36,10 +36,12 @@ namespace BCSAR
                         strg strg = new strg(br);
                         File.WriteAllText("header.json", JsonConvert.SerializeObject(header, Formatting.Indented));
                         File.WriteAllText("offsets+size.json", JsonConvert.SerializeObject(strg.tableRecordsList, Formatting.Indented));
-                        File.WriteAllText("filenames.json", JsonConvert.SerializeObject(strg.stringEntries, Formatting.Indented));
-
+                        File.WriteAllText("filenames.json", JsonConvert.SerializeObject(strg.stringEntriesList, Formatting.Indented));
+                        File.WriteAllText("lookupheader.json", JsonConvert.SerializeObject(strg.lookUpheaderList, Formatting.Indented));
+                        File.WriteAllText("lookuptable.json",JsonConvert.SerializeObject(strg.lookUpList, Formatting.Indented));
+                    
                     }
-
+                    
                 }
                 Console.ReadLine();
             }
