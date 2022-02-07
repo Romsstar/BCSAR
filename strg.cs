@@ -12,6 +12,7 @@ namespace BCSAR.STRG
 {
     public class strg
     {
+     
         public char[] magic; //MAGIC "STRG"
         public int size;
         public int id;
@@ -22,14 +23,14 @@ namespace BCSAR.STRG
         public char[] name;
         public List<stringTableRecord> tableRecordsList = new List<stringTableRecord>(); //Records.
         public List<stringEntry> stringEntries = new List<stringEntry>();
-        public List<nameString> nameList = new List<nameString>();
-         public struct stringTableRecord
+       
+        public struct stringTableRecord
         {
 
             public int node_type;
             public int names_offset;
             public int names_length;
-            }
+        }
 
         public struct stringEntry
         {
@@ -37,10 +38,7 @@ namespace BCSAR.STRG
             public byte separator; //Separator 0x0           
         }
 
-        public struct nameString
-        {
-            public string name;
-        }
+
         public strg(BinaryReader br)
         {
             magic = br.ReadChars(4);
@@ -51,27 +49,23 @@ namespace BCSAR.STRG
             lookup_pointer = br.ReadInt32();
             strgCount = br.ReadInt32();
 
-
-            for (int i = 0; i < strgCount; i++)
+             for (int i = 0; i < strgCount; i++)
             {
-
+                //Get NodeType,Offsets+Length of String Entry
                 br.BaseStream.Position = 0x5C + i * 12;
                 stringTableRecord s = new stringTableRecord();
                 s.node_type = br.ReadInt32();
                 s.names_offset = br.ReadInt32();
                 s.names_length = br.ReadInt32();
+                tableRecordsList.Add(s); 
 
-                tableRecordsList.Add(s);
-                br.BaseStream.Position = strgtableOffset + 0x8 + 0x40 + tableRecordsList[i].names_offset;  //0x40+0x10+8 = originalvalue+strgtableoffset
-                stringEntry namestr = new stringEntry();
+                //Get Filename Strings
+                br.BaseStream.Position = strgtableOffset + 0x8 +header.STRG_pointer +tableRecordsList[i].names_offset;  //0x40+0x10+8 = originalvalue+strgtableoffset
                 name = br.ReadChars(tableRecordsList[i].names_length - 1);
+                stringEntry namestr = new stringEntry();
                 namestr.filename = new string(name);
-                namestr.separator = br.ReadByte();        
+                namestr.separator = br.ReadByte();
                 stringEntries.Add(namestr);
-
-   
-
-
 
             }
 

@@ -32,7 +32,7 @@ namespace BCSAR
                 {
                     using (BinaryReader br = new BinaryReader(fs, new ASCIIEncoding()))
                     {
-                        bcsar_header header = new bcsar_header(br);
+                        header header = new header(br);
                         strg strg = new strg(br);
                         File.WriteAllText("header.json", JsonConvert.SerializeObject(header, Formatting.Indented));
                         File.WriteAllText("offsets+size.json", JsonConvert.SerializeObject(strg.tableRecordsList, Formatting.Indented));

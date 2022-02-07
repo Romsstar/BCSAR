@@ -3,7 +3,7 @@ using System.IO;
 
 namespace BCSAR.CSAR
 {
-    public class bcsar_header
+    public class header
     {
         public char[] magic; //MAGIC "CSAR"
         public short endian; //0xFEFF = Big Endian, 0xFFFE = Little Endian
@@ -13,7 +13,7 @@ namespace BCSAR.CSAR
         public int partition_num;
 
         public int STRG_id; // Always 0x2000
-        public int STRG_pointer;
+        public static int STRG_pointer { get; set; }
         public int STRG_size;
 
         public int INFO_id; // Always 0x2001
@@ -27,7 +27,7 @@ namespace BCSAR.CSAR
         public int partition4_pointer; //usually not applicable
         public int partition4__size;
 
-        public bcsar_header(BinaryReader br)
+        public header(BinaryReader br)
         {
             magic = br.ReadChars(4);
             endian = br.ReadInt16();
