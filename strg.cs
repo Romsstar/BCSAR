@@ -46,18 +46,23 @@ namespace BCSAR.STRG
             public int rootNode;
             public int nodeCount;
         }
+
+  
         public struct lookupTable
         {
 
-            public short has_data;
+            public short flags;
             public short bit_test;
-            public int fail_leaf_index;
-            public int success_leaf_index;
-            public int stringIndex;
-            public short resourceID;
-            public short resourceType;
+            public int leftidx;
+            public int rightidx;
+            public Node Nodedata;
         }
 
+        public struct Node
+        {
+            public int stringId;
+            public int itemId;
+        }
 
         public strg(BinaryReader br)
         {
@@ -96,15 +101,15 @@ namespace BCSAR.STRG
             lookUpheaderList.Add(lkheader);
 
             lookupTable records = new lookupTable();
-            for (int i = 0; i < lkheader.nodeCount; i++)
+            
+           for (int i = 0; i < lkheader.nodeCount; i++)
             {
-                records.has_data = br.ReadInt16();
+                records.flags = br.ReadInt16();
                 records.bit_test = br.ReadInt16();
-                records.fail_leaf_index = br.ReadInt32();
-                records.success_leaf_index = br.ReadInt32();
-                records.stringIndex = br.ReadInt32();
-                records.resourceID = br.ReadInt16();
-                records.resourceType = br.ReadInt16();
+                records.leftidx = br.ReadInt32();
+                records.rightidx = br.ReadInt32();
+                records.Nodedata.stringId = br.ReadInt32();
+                records.Nodedata.itemId = br.ReadInt32();
                 lookUpList.Add(records);
             }
             padding = br.ReadBytes(0xC);//Padding                     
