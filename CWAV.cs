@@ -70,7 +70,6 @@ namespace BCWAV
         public struct adpcm
         {
             public short[] coefficients;
-            public short[] destTable;
             public short predScale; //Predictor scale.
             public short yn1; //History sample 1.
             public short yn2; //History sample 2.
@@ -95,13 +94,6 @@ namespace BCWAV
             return (byte)(tmp & align);
         }
 
-        enum encoding
-        {
-            PCM8 = 0,
-            PCM16 = 1,
-            DSP_ADPCM = 2, //4 bits per sample
-            IMA_ADPCM = 3
-        }
 
         //extend Binary Readers Functionality to Read Short Array
         public short[] ReadInt16Array(BinaryReader br, uint nToRead)
@@ -173,7 +165,9 @@ namespace BCWAV
                 adpcm.yn2 = br.ReadInt16(); //History sample 2.
                 adpcm.loopPredScale = br.ReadInt16();  //Loop predictor scale.
                 adpcm.loopYn1 = br.ReadInt16();  //Loop History sample.
-                adpcm.loopYn2 = br.ReadInt16();  //Loop History sample 2.
+                adpcm.loopYn2 = adpcm.loopYn1;  //Loop History sample 2.
+                Console.WriteLine($"Loop History Sample 1 (loopYn1): 0x{adpcm.loopYn1:X4}");
+                Console.WriteLine($"Loop History Sample 2 (loopYn2): 0x{adpcm.loopYn2:X4}");
                 adpcm.padding = br.ReadBytes(4);
                 ADPCMList.Add(adpcm);
             }

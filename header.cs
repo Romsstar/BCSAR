@@ -42,10 +42,12 @@ namespace BCSAR.CSAR
 
             INFO_id = br.ReadInt32();
             INFO_pointer = br.ReadInt32();
+      
             INFO_size = br.ReadInt32();
 
             FILE_id = br.ReadInt32();
             FILE_pointer = br.ReadInt32();
+
             FILE_size = br.ReadInt32();
 
             partition4_pointer = br.ReadInt32();
