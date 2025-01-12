@@ -8,7 +8,7 @@ using NAudio.Wave;
 public class wav
 {
 
-    public static void DecodeToWav(List<(byte[] FileData, string Filename)> bcwavFiles, string outputDirectory)
+    public static void DecodeToWav(List<(byte[] FileData, string Filename)> bcwavFiles, string outputDirectory, string bcwar)
     {
         // Ensure the output directory exists
         Directory.CreateDirectory(outputDirectory);
@@ -59,7 +59,7 @@ public class wav
 
                     // Generate WAV filename
                     string wavFilename = Path.Combine(outputDirectory,
-                        Path.GetFileNameWithoutExtension(fileEntry.Filename) + ".wav");
+                        Path.GetFileNameWithoutExtension(bcwar+"_"+fileEntry.Filename) + ".wav");
 
                     // Save PCM data to WAV file
                     SaveInterleavedToWav(pcmChannels, sampleRate, wavFilename);

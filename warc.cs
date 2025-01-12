@@ -130,7 +130,7 @@ public class warc
                 var warcExtractor = new BCWARExtractor(warcReader, bcwavOutputDir);
               //  warcExtractor.ExtractBCWAV();
                 List<(byte[] FileData, string Filename)> extractedFiles = warcExtractor.GetExtractedFiles();
-          wav.DecodeToWav(extractedFiles, bcwavOutputDir);
+                wav.DecodeToWav(extractedFiles, bcwavOutputDir,name);
 
             }
         }
