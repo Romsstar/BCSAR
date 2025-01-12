@@ -26,8 +26,7 @@ public class FileTable
         // Read the file count from the table
         int fileCount = br.ReadInt32();
         long currentTableOffset = fileTableOffset + 4; // +4 to skip the file count itself
-        Console.WriteLine(currentTableOffset);
-        // Iterate through all file entries
+     
         for (int i = 0; i < fileCount; i++)
         {
             // Seek to the current table entry
@@ -56,13 +55,9 @@ public class FileTable
 
             // Add the entry to the list
             Entries.Add(entry);
-    
-       //     Console.WriteLine("Entry"+i);
-            //Console.WriteLine(filePartitionOffset + entry.offset + 8);
-            
 
             // Move to the next entry in the file table
-            currentTableOffset += 8; // Each file entry in the table is 8 bytes (2 ints)
+            currentTableOffset += 8; 
         }
     }
 }

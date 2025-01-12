@@ -120,13 +120,27 @@ public class warc
             // Read the WARC data
             byte[] warcData = br.ReadBytes((int)fileEntry.size);
 
-            // Save the WARC data to the file
-            File.WriteAllBytes(outputDirectory+name, warcData);
+            // Extract BCWAVs from the WARC in memory
+            using (var memoryStream = new MemoryStream(warcData))
+            using (var warcReader = new BinaryReader(memoryStream))
+            {
+                string bcwavOutputDir = Path.Combine(outputDirectory, $"{name}");
+                Directory.CreateDirectory(bcwavOutputDir);
+
+                var warcExtractor = new BCWARExtractor(warcReader, bcwavOutputDir);
+              //  warcExtractor.ExtractBCWAV();
+                List<(byte[] FileData, string Filename)> extractedFiles = warcExtractor.GetExtractedFiles();
+          wav.DecodeToWav(extractedFiles, bcwavOutputDir);
+
+            }
         }
     }
 
-
 }
+    
+
+
+
 
 
 

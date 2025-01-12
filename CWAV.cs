@@ -166,8 +166,6 @@ namespace BCWAV
                 adpcm.loopPredScale = br.ReadInt16();  //Loop predictor scale.
                 adpcm.loopYn1 = br.ReadInt16();  //Loop History sample.
                 adpcm.loopYn2 = adpcm.loopYn1;  //Loop History sample 2.
-                Console.WriteLine($"Loop History Sample 1 (loopYn1): 0x{adpcm.loopYn1:X4}");
-                Console.WriteLine($"Loop History Sample 2 (loopYn2): 0x{adpcm.loopYn2:X4}");
                 adpcm.padding = br.ReadBytes(4);
                 ADPCMList.Add(adpcm);
             }
