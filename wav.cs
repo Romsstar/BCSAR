@@ -2,120 +2,115 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.NetworkInformation;
+using System.Text;
+using System.Threading.Channels;
+using System.Threading.Tasks;
+using System.Xml.Linq;
+using BCSAR;
 using BCWAV;
 using NAudio.Wave;
 
-public class wav
+public class WavDecoder
 {
 
-    public static void DecodeToWav(List<(byte[] FileData, string Filename)> bcwavFiles, string outputDirectory, string bcwar)
+    public static void DecodeSingleBcwav(byte[] fileData, string outputDirectory, string bcwarName)
     {
-        // Ensure the output directory exists
-        Directory.CreateDirectory(outputDirectory);
-
-        foreach (var fileEntry in bcwavFiles)
+        using (var memoryStream = new MemoryStream(fileData))
+        using (var br = new BinaryReader(memoryStream))
         {
-            using (var memoryStream = new MemoryStream(fileEntry.FileData))
-            using (var br = new BinaryReader(memoryStream))
-            {
-                try
-                {
-                    // Parse the BCWAV file
-                    cwav cwavFile = new cwav(br);
+            // Parse the BCWAV file
+            cwav cwavFile = new cwav(br);
 
-                    if (cwavFile.InfoList.Count == 0 || cwavFile.DataBlockList.Count == 0 ||
-                        cwavFile.ADPCMList.Count == 0)
-                    {
-                        Console.WriteLine($"Skipping incomplete or invalid BCWAV file: {fileEntry.Filename}");
-                        continue;
-                    }
+            int totalSamples = cwavFile.Info.isLoop ? (cwavFile.Info.loopend) : cwavFile.Data.data.Length * 14 / 8;
 
-       
-                    // Extract DSP-ADPCM data and metadata
-                    var info = cwavFile.InfoList[0];
-                    var dataBlock = cwavFile.DataBlockList[0];
-                    var adpcm = cwavFile.ADPCMList;
+            // Storage for interleaved PCM samples
+            short[] pcmData = DecodeDSP(cwavFile.Data.data, cwavFile, totalSamples);
 
-                    int sampleRate = info.samplerate;
-                    int numChannels = info.channelnum;
-                    bool isLooping = info.loop;
-                    int loopStart = info.loopstart;
-                    int loopEnd = info.loopend;
+            // Ensure the output filename only has .wav as its extension
+            string wavFilename = Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(bcwarName)) + ".wav";
 
-                    // Calculate total samples
-                    int totalSamples = isLooping
-                        ? Math.Min(loopEnd, dataBlock.data.Length * 14 / 8)
-                        : dataBlock.data.Length * 14 / 8;
-
-                    // Prepare output buffers
-                    List<short[]> pcmChannels = new List<short[]>();
-
-                    // Decode each channel
-                    for (int channel = 0; channel < numChannels; channel++)
-                    {
-                        Console.WriteLine($"Decoding Channel {channel}, Total Samples: {totalSamples}");
-                        pcmChannels.Add(DecodeDSP(dataBlock.data, adpcm[channel], totalSamples));
-                    }
-
-                    // Generate WAV filename
-                    string wavFilename = Path.Combine(outputDirectory,
-                        Path.GetFileNameWithoutExtension(bcwar+"_"+fileEntry.Filename) + ".wav");
-
-                    // Save PCM data to WAV file
-                    SaveInterleavedToWav(pcmChannels, sampleRate, wavFilename);
-
-                    Console.WriteLine($"Decoded to WAV: {wavFilename}");
-                }
-            
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error processing BCWAV file {fileEntry.Filename}: {ex.Message}");
-                }
-            }
+            SaveInterleavedToWav(pcmData, cwavFile.Info.samplerate, totalSamples, cwavFile.Info.channelnum, wavFilename);
         }
     }
 
 
 
-
-private static short[] DecodeDSP(byte[] dspData, cwav.adpcm adpcm, int totalSamples)
+    public static void BatchDecode(List<(byte[] FileData, string Filename)> bcwavFiles, string outputDirectory, string bcwar)
     {
-        short[] pcmSamples = new short[totalSamples];
-        int pcmIndex = 0;
+        // Group files by base filename (without extensions) to identify duplicates
+        var groupedFiles = bcwavFiles
+            .GroupBy(file => Path.GetFileNameWithoutExtension(bcwar))
+            .ToDictionary(group => group.Key, group => group.Count());
 
-        // Initialize history and coefficients
-        short yn1 = adpcm.yn1; // History sample 1
-        short yn2 = adpcm.yn2; // History sample 2
-        short[] coefficients = adpcm.coefficients;
-
-        // Decode each DSP frame (8 bytes = 14 samples)
-        for (int i = 0; i < dspData.Length; i += 8)
+        Parallel.ForEach(bcwavFiles, fileEntry =>
         {
-            // Read the header byte
-            byte header = dspData[i];
-            int predictorIndex = (header >> 4) & 0x0F; // Upper 4 bits: predictor index
-            short scale = (short)(1 << (header & 0x0F)); // Lower 4 bits: scale factor
+            // Get the base filename without extension
+            string baseFilename = Path.GetFileNameWithoutExtension(bcwar);
 
-            // Validate predictor index
-            if (predictorIndex < 0 || predictorIndex >= coefficients.Length / 2)
+            // Determine if a suffix should be appended
+            string filenamePart = (groupedFiles[baseFilename] > 1)
+                ? "_" + fileEntry.Filename
+                : "";
+
+            // Decode the file
+            DecodeSingleBcwav(fileEntry.FileData, outputDirectory, bcwar + filenamePart);
+        });
+    }
+
+
+
+    private static short[] DecodeDSP(byte[] dspData, cwav cwav, int totalSamples)
+    {
+        int channelCount = cwav.Info.channelnum;
+        short[] pcmSamples = new short[totalSamples * channelCount];
+
+        // Parallelize the decoding across channels
+        Parallel.For(0, channelCount, channel =>
+        {
+            short yn1, yn2;
+
+            int channelOffset = cwav.sampleref[channel].offset;
+            yn1 = cwav.Info.isLoop ? cwav.adpcmInfo[channel].loopYn1 : cwav.adpcmInfo[channel].yn1;
+            yn2 = cwav.Info.isLoop ? cwav.adpcmInfo[channel].loopYn2 : cwav.adpcmInfo[channel].yn2;
+
+            short[] coefficients = cwav.adpcmInfo[channel].coefficients;
+
+            int pcmIndex = channel;
+            for (int i = channelOffset; i < dspData.Length; i += 8)
             {
-                throw new Exception($"Invalid predictor index ({predictorIndex}) in DSP data.");
-            }
+                byte header = dspData[i];
+                int predictorIndex = (header >> 4) & 0x0F;
+                short scale = (short)(1 << (header & 0x0F));
 
-            // Get the predictor coefficients
-            short coef1 = coefficients[predictorIndex * 2];
-            short coef2 = coefficients[predictorIndex * 2 + 1];
+                if (predictorIndex < 0 || predictorIndex >= coefficients.Length / 2)
+                {
+                    throw new Exception($"Invalid predictor index ({predictorIndex}) in DSP data at offset {i}.");
+                }
 
-            for (int j = 0; j < 14 && pcmIndex + 1 < pcmSamples.Length; j += 2)
-            {
-                byte nibblePair = dspData[i + 1 + j / 2];
-                pcmSamples[pcmIndex++] = DecodeDSPNibble((nibblePair >> 4) & 0x0F, scale, coef1, coef2, ref yn1, ref yn2);
-                pcmSamples[pcmIndex++] = DecodeDSPNibble(nibblePair & 0x0F, scale, coef1, coef2, ref yn1, ref yn2);
+                short coef1 = coefficients[predictorIndex * 2];
+                short coef2 = coefficients[predictorIndex * 2 + 1];
+
+                for (int j = 0; j < 14 && pcmIndex + channelCount < pcmSamples.Length; j += 2)
+                {
+                    if (i + 1 + j / 2 >= dspData.Length)
+                    {
+                        throw new Exception($"DSP data ended unexpectedly at offset {i + 1 + j / 2}.");
+                    }
+
+                    byte nibblePair = dspData[i + 1 + j / 2];
+                    pcmSamples[pcmIndex] = DecodeDSPNibble((nibblePair >> 4) & 0x0F, scale, coef1, coef2, ref yn1, ref yn2);
+                    pcmIndex += channelCount;
+                    pcmSamples[pcmIndex] = DecodeDSPNibble(nibblePair & 0x0F, scale, coef1, coef2, ref yn1, ref yn2);
+                    pcmIndex += channelCount;
+                }
             }
-        }
+        });
 
         return pcmSamples;
     }
+
+
 
     private static short DecodeDSPNibble(int nibble, short scale, short coef1, short coef2, ref short yn1, ref short yn2)
     {
@@ -138,34 +133,21 @@ private static short[] DecodeDSP(byte[] dspData, cwav.adpcm adpcm, int totalSamp
         return (short)sample;
     }
 
-
-    private static void SaveInterleavedToWav(List<short[]> pcmChannels, int sampleRate, string outputFile)
+    
+    private static void SaveInterleavedToWav(short[] pcmData, int sampleRate, int numSamples, int numChannels, string outputFile)
     {
-        int numChannels = pcmChannels.Count;
-        int numSamples = pcmChannels[0].Length;
-
-
         using (var writer = new WaveFileWriter(outputFile, new WaveFormat(sampleRate, 16, numChannels)))
         {
-            for (int i = 0; i < numSamples; i++)
+            for (int i = 0; i < numSamples * numChannels; i++)
             {
-                foreach (var channel in pcmChannels)
-                {
-                    writer.WriteSample(channel[i] / 32768.0f); // Convert to float
-                }
+                // Normalize PCM data to float and write the sample
+                float normalizedSample = pcmData[i] / 32768.0f;
+                writer.WriteSample(normalizedSample);
             }
         }
     }
-
-
-
-    }
-
-  
-
-
-
-
+    
+}
 
 
 

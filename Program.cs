@@ -18,7 +18,7 @@ namespace BCSAR
         static void Main(string[] args)
         {
             string bcsarPath = "p10_sound.bcsar"; // Input BCSAR file
-            string outputDir = "extracted\\"; // Output directory
+            string outputDir = "extracted//"; // Output directory
 
             try
             {
@@ -30,12 +30,10 @@ namespace BCSAR
                     info infoData = new info(br); // Parse INFO section
 
                     // Parse File Table
-                    long fileTableOffset = infoData.FILETable + header.INFO_pointer+ 8; // Adjust by header
+                    long fileTableOffset = infoData.FILETable + header.INFO_pointer + 8; // Adjust by header
                     br.BaseStream.Seek(fileTableOffset, SeekOrigin.Begin);
-                    FileTable fileTableData = new FileTable(br, fileTableOffset,header.FILE_pointer);
-
-         
-
+                    FileTable fileTableData = new FileTable(br, fileTableOffset, header.FILE_pointer);
+                    
                     long warcTableOffset = infoData.warcTable + header.INFO_pointer + 8; // Adjust by header
                     br.BaseStream.Seek(warcTableOffset, SeekOrigin.Begin);
                     warc warcData = new warc(br, strgData, fileTableData, outputDir);
@@ -51,5 +49,8 @@ namespace BCSAR
         }
     }
 }
+
+
+
 
 

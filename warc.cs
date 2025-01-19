@@ -5,6 +5,7 @@ using System.Linq;
 using System.Xml.Linq;
 using BCSAR.CSAR;
 using BCSAR.STRG;
+using BCWAV;
 using Newtonsoft.Json;
 
 public class warc
@@ -89,7 +90,7 @@ public class warc
             currentTableOffset += 8;
         }
     }
-    
+
 
 
     public void ExtractWARCs(BinaryReader br, strg strgData, FileTable fileTable, string outputDirectory)
@@ -99,13 +100,13 @@ public class warc
         for (int i = 0; i < warctableList.Count; i++)
         {
             var fileEntry = fileTable.Entries.FirstOrDefault(f => f.FileID == filetableList[i].fileid);
-        
 
-        if (fileEntry == null)
-        {
-            Console.WriteLine($"Warning: No matching FileTable entry for WARC ID {filetableList[i].fileid}");
-            continue;
-        }
+
+            if (fileEntry == null)
+            {
+                Console.WriteLine($"Warning: No matching FileTable entry for WARC ID {filetableList[i].fileid}");
+                continue;
+            }
 
             // Resolve filename from STRG or generate a default one
             string name = (filetableList[i].nameid != 0xFFFFFFFF && filetableList[i].nameid < strgData.stringEntriesList.Count)
@@ -113,8 +114,8 @@ public class warc
                 : $"WAR_{i:D8}";
 
             // Calculate absolute offset to the WARC data
-            long absoluteOffset = header.FILE_pointer + fileEntry.offset+8;
-      
+            long absoluteOffset = header.FILE_pointer + fileEntry.offset + 8;
+
             br.BaseStream.Seek(absoluteOffset, SeekOrigin.Begin);
 
             // Read the WARC data
@@ -128,16 +129,17 @@ public class warc
                 Directory.CreateDirectory(bcwavOutputDir);
 
                 var warcExtractor = new BCWARExtractor(warcReader, bcwavOutputDir);
-              //  warcExtractor.ExtractBCWAV();
                 List<(byte[] FileData, string Filename)> extractedFiles = warcExtractor.GetExtractedFiles();
-                wav.DecodeToWav(extractedFiles, bcwavOutputDir,name);
+
+                string BCWAVName = Path.GetFileNameWithoutExtension(name).Replace("WA_", "");
+                WavDecoder.BatchDecode(extractedFiles, bcwavOutputDir, BCWAVName);
+                
 
             }
         }
     }
 
 }
-    
 
 
 

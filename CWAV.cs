@@ -13,9 +13,15 @@ namespace BCWAV
     public class cwav
     {
 
-        public List<INFOBlock> InfoList = new List<INFOBlock>();
-        public List<DATABlock> DataBlockList = new List<DATABlock>();
-        public List<adpcm> ADPCMList = new List<adpcm>();
+
+        public cwav_reference[] channelinfo;  // Array of references for channelinfo
+        public cwav_reference[] sampleref;    // Array of references for sampleref
+        public cwav_reference[] codecref;     // Array of references for codecref
+        public INFOBlock Info;
+        public DATABlock Data;
+        public adpcm[] adpcmInfo;
+
+     
         public struct header
         {
             public char[] magic; //"CWAV"
@@ -26,9 +32,9 @@ namespace BCWAV
             public int numBlocks;
         }
 
-        public struct INFOReference
+        public class INFOReference
         {
-            public int ID;
+            public int ID { get; set; }
             public int offset;
             public int size;
         }
@@ -40,34 +46,27 @@ namespace BCWAV
             public int size;
         }
 
-        public struct INFOBlock
+        public class INFOBlock
         {
             public byte[] magic; //"INFO"
             public int size;
             public byte encoding;
-            public bool loop;
+            public bool isLoop { get; set; }
             public short padding;
             public int samplerate;
             public int loopstart, loopend;
             public int unk1, channelnum;
 
         }
-
-        public struct sampleInfo
+        
+        public struct cwav_reference
         {
-            public int id;
+            public short id;
+            public short padding;
             public int offset;
         }
-
-        public struct adpcminfo
-        {
-            public int sampledata;
-            public int sampleoffset;
-            public int dspID;
-            public int dspOff;
-            public int unk3;
-        }
-        public struct adpcm
+        
+        public class adpcm
         {
             public short[] coefficients;
             public short predScale; //Predictor scale.
@@ -76,10 +75,9 @@ namespace BCWAV
             public short loopPredScale; //Loop predictor scale.
             public short loopYn1; //Loop History sample.
             public short loopYn2; //Loop History sample 2.
-            public byte[] padding; //Padding.
         }
 
-        public struct DATABlock
+        public class DATABlock
         {
             public char[] magic; //"DATA"
             public int size;
@@ -87,24 +85,20 @@ namespace BCWAV
         }
 
         //For Calculating Alignment
-        private byte paddingCalc(int pos, byte align)
+        private int paddingCalc(int position, int alignment)
         {
-            byte tmp = (byte)(align - 1);
-            align -= (byte)(pos & tmp);
-            return (byte)(tmp & align);
+            return (alignment - (position % alignment)) % alignment;
+        }
+
+        enum encoding
+        {
+            PCM8 = 0,
+            PCM16 = 1,
+            DSP_ADPCM = 2, //4 bits per sample
+            IMA_ADPCM = 3
         }
 
 
-        //extend Binary Readers Functionality to Read Short Array
-        public short[] ReadInt16Array(BinaryReader br, uint nToRead)
-        {
-            short[] array = new short[nToRead];
-            for (int i = 0; i < nToRead; i++)
-            {
-            array[i] = br.ReadInt16();
-            }
-            return array;
-        }
 
         public cwav(BinaryReader br)
         {
@@ -128,61 +122,99 @@ namespace BCWAV
 
             br.ReadBytes(20); //Padding
 
-            INFOBlock Info = new INFOBlock();
+            Info = new INFOBlock();
             Info.magic = br.ReadBytes(4);
             Info.size = br.ReadInt32();
             Info.encoding = br.ReadByte();
-            Info.loop = br.ReadBoolean();
+            Info.isLoop = br.ReadBoolean();
             Info.padding = br.ReadInt16();
             Info.samplerate = br.ReadInt32();
             Info.loopstart = br.ReadInt32();
             Info.loopend = br.ReadInt32(); //=num_samples;
             Info.unk1 = br.ReadInt32();
             Info.channelnum = br.ReadInt32();
-            InfoList.Add(Info);
+
+            int channelNum = Info.channelnum;
+            channelinfo = new cwav_reference[Info.channelnum];
+            sampleref = new cwav_reference[Info.channelnum];
+            codecref = new cwav_reference[Info.channelnum];
+            adpcmInfo = new adpcm[Info.channelnum];
 
             for (int i = 0; i < Info.channelnum; i++)
             {
-                sampleInfo sampleInfo = new sampleInfo();
-                sampleInfo.id = br.ReadInt32(); //0x7100
-                sampleInfo.offset = br.ReadInt32();
+                // Read the channel reference (Channel info)
+                channelinfo[i] = new cwav_reference();
+                channelinfo[i].id = br.ReadInt16();  // 2 bytes: Read Channel ID
+                channelinfo[i].padding = br.ReadInt16();  // 2 bytes: Padding
+                channelinfo[i].offset = br.ReadInt32() + 0x1C+INFOReference.offset;  // 4 bytes: Read Channel offset
             }
+
             for (int i = 0; i < Info.channelnum; i++)
             {
-                adpcminfo adpcminfo = new adpcminfo();
-                adpcminfo.sampledata = br.ReadInt32(); //0x1F00
-                adpcminfo.sampleoffset = br.ReadInt32();
-                adpcminfo.dspID = br.ReadInt32();
-                adpcminfo.dspOff = br.ReadInt32();
-                adpcminfo.unk3 = br.ReadInt32();
+                sampleref[i] = new cwav_reference();
+                sampleref[i].id = br.ReadInt16();  // 0x1F00
+                sampleref[i].padding = br.ReadInt16(); 
+                sampleref[i].offset = br.ReadInt32()+DATAReference.offset+8;  //Sample offset
+          
+                codecref[i] = new cwav_reference();
+                codecref[i].id = br.ReadInt16();  // 2 bytes: Sample ID
+                codecref[i].padding = br.ReadInt16();  // 2 bytes: Padding
+                codecref[i].offset = br.ReadInt32() + channelinfo[i].offset;  // DSP Offset
+                br.ReadInt32(); //Reserved
             }
+
             for (int i = 0; i < Info.channelnum; i++)
             {
-                adpcm adpcm = new adpcm();
-                adpcm.coefficients = ReadInt16Array(br, 16);
-                adpcm.predScale = br.ReadInt16(); //Predictor scale.
-                adpcm.yn1 = br.ReadInt16(); //History sample 1.
-                adpcm.yn2 = br.ReadInt16(); //History sample 2.
-                adpcm.loopPredScale = br.ReadInt16();  //Loop predictor scale.
-                adpcm.loopYn1 = br.ReadInt16();  //Loop History sample.
-                adpcm.loopYn2 = adpcm.loopYn1;  //Loop History sample 2.
-                adpcm.padding = br.ReadBytes(4);
-                ADPCMList.Add(adpcm);
+                Console.WriteLine($"Channel {i}:");
+                Console.WriteLine($" > Channel ref idtype:  0x{channelinfo[i].id:X4}");
+                Console.WriteLine($" > Channel ref offset:  0x{channelinfo[i].offset:X8}");
+                Console.WriteLine($" > Sample ref idtype:   0x{sampleref[i].id:X4}");
+                Console.WriteLine($" > Sample ref offset:   0x{sampleref[i].offset:X8}");
+                Console.WriteLine($" > Codec ref idtype:    0x{codecref[i].id:X4}");
+                Console.WriteLine($" > Codec ref offset:    0x{codecref[i].offset:X8}");
             }
+
+
+            for (int i = 0; i < Info.channelnum; i++)
+            {
+                adpcmInfo[i] = new adpcm();
+                adpcmInfo[i].coefficients = new short[16];
+                
+                for (int j = 0; j < 16; j++)
+                {
+                    adpcmInfo[i].coefficients[j] = br.ReadInt16(); // Read each coefficient
+                }
+
+                adpcmInfo[i].predScale = br.ReadInt16(); //Predictor scale.
+                adpcmInfo[i].yn1 = br.ReadInt16(); //History sample 1.
+                adpcmInfo[i].yn2 = br.ReadInt16(); //History sample 2.
+                adpcmInfo[i].loopPredScale = br.ReadInt16();  //Loop predictor scale.
+                adpcmInfo[i].loopYn1 = br.ReadInt16();  //Loop History sample.
+                adpcmInfo[i].loopYn2 = br.ReadInt16();  //Loop History sample 2.
+                br.ReadBytes(2);
+                Console.WriteLine($"Channel {i} coefficients:");
+                for (int j = 0; j < adpcmInfo[i].coefficients.Length; j++)
+                {
+                    Console.WriteLine($"Coefficient {j}: {adpcmInfo[i].coefficients[j]:X8}");
+                }
+                Console.WriteLine($"Loop PredScale : {adpcmInfo[i].loopPredScale:X8}");
+            }
+
             br.ReadBytes(paddingCalc((int)br.BaseStream.Position, 0x20));
 
-            DATABlock datablock = new DATABlock();
-            datablock.magic = br.ReadChars(4);
-            datablock.size = br.ReadInt32();
-            datablock.data = br.ReadBytes(datablock.size - 0x8);
-            DataBlockList.Add(datablock);
-     
+            Data = new DATABlock();
+            Data.magic = br.ReadChars(4);
+            Data.size = br.ReadInt32();
+
+            Data.data = br.ReadBytes(Data.size - 0x8);
+       
+
         }
+
     }
 
 
 }
-
 
 
 

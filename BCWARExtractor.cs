@@ -112,7 +112,7 @@ public class BCWARExtractor
             string filename = Path.Combine(outputDirectory, $"{i}{ext}");
             File.WriteAllBytes(filename, fileData);
 
-            Console.WriteLine($"Extracted {filename}");
+      
         }
     }
 
@@ -136,15 +136,12 @@ public class BCWARExtractor
             br.BaseStream.Seek(fileOffset, SeekOrigin.Begin);
             byte[] fileData = br.ReadBytes(fileInfo.Size);
 
-            // Determine the file extension (placeholder function, you should implement proper detection)
             string ext = DetermineFileExtension(fileData);
 
             string filename = $"{i}{ext}";
 
             // Add the file data and filename to the list
             extractedFiles.Add((fileData, filename));
-
-            Console.WriteLine($"Extracted in-memory: {filename}");
         }
 
         return extractedFiles;
@@ -159,8 +156,7 @@ public class BCWARExtractor
 
     private string DetermineFileExtension(byte[] fileData)
     {
-        // Simple placeholder for determining extensions, implement as needed
-        if (fileData.Length >= 4 && fileData[0] == 'C' && fileData[1] == 'W' && fileData[2] == 'A' && fileData[3] == 'V')
+       if (fileData.Length >= 4 && fileData[0] == 'C' && fileData[1] == 'W' && fileData[2] == 'A' && fileData[3] == 'V')
             return ".bcwav";
         return ".bin";
     }
