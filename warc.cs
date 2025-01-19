@@ -7,6 +7,7 @@ using BCSAR.CSAR;
 using BCSAR.STRG;
 using BCWAV;
 using Newtonsoft.Json;
+using static System.Net.WebRequestMethods;
 
 public class warc
 {
@@ -14,8 +15,7 @@ public class warc
 
     public List<warctable> warctableList = new List<warctable>();
     public List<filetable> filetableList = new List<filetable>();
-    public List<TableEntry> Entries { get; private set; }
-
+    public List<(byte[] FileData, string Filename)> extractedFiles;
     public struct warctable
     {
         public int id;
@@ -39,11 +39,9 @@ public class warc
         public long Offset { get; set; } // The offset of the entry in the file
     }
 
-    public warc(BinaryReader br, strg strgData, FileTable fileTable, string outputDirectory)
+    public warc(BinaryReader br, strg strgData, FileTable fileTable)
     {
-        // Ensure output directory exists
-        Directory.CreateDirectory(outputDirectory);
-
+ 
         long baseOffset = br.BaseStream.Position; // Store Base Offset for correct offset calculation
 
         // Read the number of WARC entries
@@ -90,6 +88,57 @@ public class warc
             currentTableOffset += 8;
         }
     }
+    public List<(List<(byte[] FileData, string Filename)> Files, string BcwarName)> ExtractWARIO(
+    BinaryReader br, strg strgData, FileTable fileTable, string outputDirectory)
+    {
+        // Ensure the output directory exists
+        Directory.CreateDirectory(outputDirectory);
+
+        var extractedFilesWithBcwar = new List<(List<(byte[] FileData, string Filename)> Files, string BcwarName)>();
+
+        for (int i = 0; i < warctableList.Count; i++)
+        {
+            var fileEntry = fileTable.Entries.FirstOrDefault(f => f.FileID == filetableList[i].fileid);
+
+            if (fileEntry == null)
+            {
+                Console.WriteLine($"Warning: No matching FileTable entry for WARC ID {filetableList[i].fileid}");
+                continue;
+            }
+
+            // Resolve the WARC name or generate a default one
+            string warcName = (filetableList[i].nameid != 0xFFFFFFFF &&
+                               filetableList[i].nameid < strgData.stringEntriesList.Count)
+                ? strgData.stringEntriesList[filetableList[i].nameid].filename
+                : $"WAR_{i:D8}";
+
+            // Calculate absolute offset to the WARC data
+            long absoluteOffset = header.FILE_pointer + fileEntry.offset + 8;
+
+            br.BaseStream.Seek(absoluteOffset, SeekOrigin.Begin);
+
+            // Read the WARC data
+            byte[] warcData = br.ReadBytes((int)fileEntry.size);
+
+            // Extract BCWAVs from the WARC in memory
+            using (var memoryStream = new MemoryStream(warcData))
+            using (var warcReader = new BinaryReader(memoryStream))
+            {
+                string bcwavOutputDir = Path.Combine(outputDirectory, warcName);
+                Directory.CreateDirectory(bcwavOutputDir);
+
+                var warcExtractor = new bcwar_extract(warcReader, bcwavOutputDir);
+                var extractedFiles = warcExtractor.GetExtractedFiles();
+
+                if (extractedFiles != null)
+                {
+                    extractedFilesWithBcwar.Add((extractedFiles, warcName));
+                }
+            }
+        }
+
+        return extractedFilesWithBcwar; // Return extracted files grouped by WARC name
+    }
 
 
 
@@ -109,7 +158,8 @@ public class warc
             }
 
             // Resolve filename from STRG or generate a default one
-            string name = (filetableList[i].nameid != 0xFFFFFFFF && filetableList[i].nameid < strgData.stringEntriesList.Count)
+            string name = (filetableList[i].nameid != 0xFFFFFFFF &&
+                           filetableList[i].nameid < strgData.stringEntriesList.Count)
                 ? strgData.stringEntriesList[filetableList[i].nameid].filename
                 : $"WAR_{i:D8}";
 
@@ -128,17 +178,15 @@ public class warc
                 string bcwavOutputDir = Path.Combine(outputDirectory, $"{name}");
                 Directory.CreateDirectory(bcwavOutputDir);
 
-                var warcExtractor = new BCWARExtractor(warcReader, bcwavOutputDir);
-                List<(byte[] FileData, string Filename)> extractedFiles = warcExtractor.GetExtractedFiles();
-
-                string BCWAVName = Path.GetFileNameWithoutExtension(name).Replace("WA_", "");
+                var warcExtractor = new bcwar_extract(warcReader, bcwavOutputDir);
+                extractedFiles = warcExtractor.GetExtractedFiles();
+       
+               string BCWAVName = Path.GetFileNameWithoutExtension(name).Replace("WA_", "");
                 WavDecoder.BatchDecode(extractedFiles, bcwavOutputDir, BCWAVName);
-                
-
             }
+
         }
     }
-
 }
 
 

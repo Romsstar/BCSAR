@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using BCSAR.CSAR;
 
 namespace BCSAR.INFO
 {
@@ -20,8 +21,8 @@ namespace BCSAR.INFO
         public int groupTable;
         public int playerTableID;
         public int playerTable;
-        public int FILETableID;
-        public int FILETable;
+        public int fileTableID;
+        public int fileTable;
 
         public info(BinaryReader br)
         {
@@ -34,13 +35,13 @@ namespace BCSAR.INFO
             bankTableID = br.ReadInt32();
             bankTable = br.ReadInt32();
             warcID = br.ReadInt32();
-            warcTable = br.ReadInt32(); // Convert relative to absolute
+            warcTable = br.ReadInt32() + header.INFO_pointer + 8; 
             groupTableID = br.ReadInt32();
             groupTable= br.ReadInt32();
             playerTableID= br.ReadInt32();
             playerTable =br.ReadInt32() ;
-            FILETableID =br.ReadInt32();
-            FILETable=br.ReadInt32();
+            fileTableID =br.ReadInt32();
+            fileTable=br.ReadInt32() + header.INFO_pointer + 8;
 
         }
     }

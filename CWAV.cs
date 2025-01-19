@@ -12,8 +12,6 @@ namespace BCWAV
 {
     public class cwav
     {
-
-
         public cwav_reference[] channelinfo;  // Array of references for channelinfo
         public cwav_reference[] sampleref;    // Array of references for sampleref
         public cwav_reference[] codecref;     // Array of references for codecref
@@ -21,7 +19,6 @@ namespace BCWAV
         public DATABlock Data;
         public adpcm[] adpcmInfo;
 
-     
         public struct header
         {
             public char[] magic; //"CWAV"
@@ -56,7 +53,6 @@ namespace BCWAV
             public int samplerate;
             public int loopstart, loopend;
             public int unk1, channelnum;
-
         }
         
         public struct cwav_reference
@@ -163,16 +159,7 @@ namespace BCWAV
                 br.ReadInt32(); //Reserved
             }
 
-            for (int i = 0; i < Info.channelnum; i++)
-            {
-                Console.WriteLine($"Channel {i}:");
-                Console.WriteLine($" > Channel ref idtype:  0x{channelinfo[i].id:X4}");
-                Console.WriteLine($" > Channel ref offset:  0x{channelinfo[i].offset:X8}");
-                Console.WriteLine($" > Sample ref idtype:   0x{sampleref[i].id:X4}");
-                Console.WriteLine($" > Sample ref offset:   0x{sampleref[i].offset:X8}");
-                Console.WriteLine($" > Codec ref idtype:    0x{codecref[i].id:X4}");
-                Console.WriteLine($" > Codec ref offset:    0x{codecref[i].offset:X8}");
-            }
+     
 
 
             for (int i = 0; i < Info.channelnum; i++)
@@ -192,12 +179,7 @@ namespace BCWAV
                 adpcmInfo[i].loopYn1 = br.ReadInt16();  //Loop History sample.
                 adpcmInfo[i].loopYn2 = br.ReadInt16();  //Loop History sample 2.
                 br.ReadBytes(2);
-                Console.WriteLine($"Channel {i} coefficients:");
-                for (int j = 0; j < adpcmInfo[i].coefficients.Length; j++)
-                {
-                    Console.WriteLine($"Coefficient {j}: {adpcmInfo[i].coefficients[j]:X8}");
-                }
-                Console.WriteLine($"Loop PredScale : {adpcmInfo[i].loopPredScale:X8}");
+              
             }
 
             br.ReadBytes(paddingCalc((int)br.BaseStream.Position, 0x20));
@@ -205,12 +187,41 @@ namespace BCWAV
             Data = new DATABlock();
             Data.magic = br.ReadChars(4);
             Data.size = br.ReadInt32();
-
             Data.data = br.ReadBytes(Data.size - 0x8);
-       
 
         }
+        public static void printChannelInfo(cwav cwavFile)
+        {
+            for (int i = 0; i < cwavFile.Info.channelnum; i++)
+            {
+                Console.WriteLine($"Channel {i}:");
+                Console.WriteLine($" > Channel ref idtype:  0x{cwavFile.channelinfo[i].id:X4}");
+                Console.WriteLine($" > Channel ref offset:  0x{cwavFile.channelinfo[i].offset:X8}");
+                Console.WriteLine($" > Sample ref idtype:   0x{cwavFile.sampleref[i].id:X4}");
+                Console.WriteLine($" > Sample ref offset:   0x{cwavFile.sampleref[i].offset:X8}");
+                Console.WriteLine($" > Codec ref idtype:    0x{cwavFile.codecref[i].id:X4}");
+                Console.WriteLine($" > Codec ref offset:    0x{cwavFile.codecref[i].offset:X8}");
 
+                Console.WriteLine($"Channel {i} coefficients:");
+                for (int j = 0; j < cwavFile.adpcmInfo[i].coefficients.Length; j++)
+                {
+                    Console.WriteLine($"Coefficient {j}: {cwavFile.adpcmInfo[i].coefficients[j]:X8}");
+                }
+                if (cwavFile.Info.isLoop)
+                {
+                    Console.WriteLine($"Loop Yn1 : {cwavFile.adpcmInfo[i].loopYn1:X8}");
+                    Console.WriteLine($"Loop Yn2 : {cwavFile.adpcmInfo[i].loopYn1:X8}");
+                    Console.WriteLine($"Loop PredScale : {cwavFile.adpcmInfo[i].loopPredScale:X8}");
+                }
+                else
+                {
+                    Console.WriteLine($"Yn1 : {cwavFile.adpcmInfo[i].yn1:X8}");
+                    Console.WriteLine($"Yn2 : {cwavFile.adpcmInfo[i].yn2:X8}");
+                    Console.WriteLine($"PredScale : {cwavFile.adpcmInfo[i].predScale:X8}");
+
+                }
+            }
+        }
     }
 
 

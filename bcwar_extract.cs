@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 
-public class BCWARExtractor
+public class bcwar_extract
 {
     private readonly string outputDirectory;
     private readonly BinaryReader br;
@@ -11,19 +11,12 @@ public class BCWARExtractor
     private long fileSectionOffset;
     private List<FileInfoEntry> fileEntries;
 
-    public BCWARExtractor(BinaryReader br, string outputDirectory)
+    public bcwar_extract(BinaryReader br, string outputDirectory)
     {
         this.br = br;
         this.outputDirectory = outputDirectory;
         Directory.CreateDirectory(outputDirectory);
         fileEntries = new List<FileInfoEntry>();
-    }
-
-    public void Extract()
-    {
-        ParseHeader();
-        ReadInfoSection();
-        ExtractFiles();
     }
 
     private void ParseHeader()
@@ -111,8 +104,7 @@ public class BCWARExtractor
 
             string filename = Path.Combine(outputDirectory, $"{i}{ext}");
             File.WriteAllBytes(filename, fileData);
-
-      
+            
         }
     }
 
